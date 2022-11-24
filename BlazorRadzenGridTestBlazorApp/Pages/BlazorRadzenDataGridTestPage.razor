@@ -1,5 +1,7 @@
 ﻿@inject HttpClient HttpClient
 @page "/blazor-radzen-grid-tests"
+@inject NavigationManager NavigationManager
+
 
 <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H3" Class="my-4">Adjust Artist Type</RadzenText>
 
@@ -13,7 +15,7 @@
                 AllowFiltering="true"
                 FilterMode="FilterMode.SimpleWithMenu"
                 FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                LogicalFilterOperator="LogicalFilterOperator.Or"
+                LogicalFilterOperator="LogicalFilterOperator.And"
                 PageSize="25"
                 AllowMultiColumnSorting="false"
                 AllowSorting="true">
@@ -43,7 +45,7 @@
         <RadzenDataGridColumn TItem="TestDataModel" Property="Name" FilterProperty="Name" Title="Name">
 
         </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="TestDataModel" Property="IsVerified" FilterProperty="IsVerified" Title="Verified" Width="130px" Type="typeof(bool)">
+        <RadzenDataGridColumn TItem="TestDataModel" Property="IsVerified" FilterProperty="IsVerified" Title="Verified" Width="130px" Type="typeof(bool)">
             <Template Context="detail">
                 <RadzenCheckBox @bind-Value=@detail.IsVerified TValue="bool" Change=@(args => OnCheckboxClicked_IsVerified(detail, args)) />
             </Template>
@@ -67,7 +69,7 @@
 
     private List<string> ArtistTypeOptions = new List<string> { "Person", "Group" };
 
-    IEnumerable<TestDataModel> GridItems = Array.Empty<TestDataModel>();
+    IEnumerable<TestDataModel>? GridItems;
     int TotalSize;
 
     void OnComboBoxSelectedArtistTypeFilter(object value)
@@ -80,48 +82,11 @@
 
     async Task LoadData(LoadDataArgs loadDataArgs)
     {
-        var query = new Dictionary<string, string>();
-        query.Add("skip", loadDataArgs.Skip.Value.ToString());
-        query.Add("top", loadDataArgs.Top.Value.ToString());
-        query.Add("count", "true");
-
-        if (!String.IsNullOrEmpty(loadDataArgs.OrderBy))
-            query.Add("orderby", loadDataArgs.OrderBy);
-
-        /*
-    if (!String.IsNullOrEmpty(loadDataArgs.Filter)) //'(Name == null ? "" : Name).ToLower().Contains("Air".ToLower())'
-        query.Add("filter", loadDataArgs.Filter);
-
-        //
-        // https://localhost:7290/odata/ODataTest?skip=0&top=10&count=true&$filter=contains(tolower(Name), tolower('10'))
-         Filter from radzen grid '(Name == null ? "" : Name).ToLower().Contains("10".ToLower())'
-
-         Another issue with determing what kind of data type the filter is so that the filter string for a boolean check can be generated;
-         What I would expect: 
-         IsVerified eq false 
-
-         The 
-         */
-                
-       if (loadDataArgs.Filters.Count() > 0)
-        {
-            // IsIgnored eq false
-            //  https://localhost:7290/odata/DiscogsArtistAdjustType?skip=0&top=36&count=true&$filter=IsIgnored eq false
-            string odataFilter = loadDataArgs.Filters.ToODataFilterString(DataGrid);
-            
-            if (!String.IsNullOrEmpty(odataFilter))
-            {
-                query.Add("filter", odataFilter);
-            }
-        }
-
-        var uri = QueryHelpers.AddQueryString("odata/ODataTest", query);
-
+        var uri = new Uri($"{NavigationManager.BaseUri}odata/ODataTest");
+        uri = uri.GetODataUri(filter: loadDataArgs.Filter, top: loadDataArgs.Top, skip: loadDataArgs.Skip, orderby: loadDataArgs.OrderBy, count: true);
         var response = await HttpClient.GetFromJsonAsync<ODataPagedResultModel<TestDataModel>>(uri);
-
         TotalSize = response.TotalSize;
-
-        GridItems = response.Value.AsODataEnumerable(); //https://blazor.radzen.com/datagrid-odata todo
+        GridItems = response.Value.AsODataEnumerable();
     }
 
     private async Task OnSelectedChanged_ArtistType(TestDataModel TestDataModel, string artistType)
@@ -140,7 +105,7 @@
         await HttpClient.PostAsJsonAsync<TestDataModel>("api/ODataTestWrite", TestDataModel);
         StateHasChanged();
     }
-      
+
     public enum ArtistTypeFilterOptions
     {
         Person,

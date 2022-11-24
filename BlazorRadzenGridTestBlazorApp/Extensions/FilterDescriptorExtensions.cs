@@ -29,16 +29,8 @@ namespace BlazorRadzenGridTests.BlazorApp.Extensions
             string value = !second ? (string)Convert.ChangeType(column.FilterValue, typeof(string)) :
                 (string)Convert.ChangeType(column.SecondFilterValue, typeof(string));
 
-            var filterPropertyType = column.Property.GetType();
-            var filterPropertyValue = column.FilterValue.GetType();
-
-            var gridColumn = dataGrid.ColumnsCollection.Where(c => c.Property == property).FirstOrDefault();
-           
-            if (property == "IsVerified" || property == "IsIgnored") // Quick fix.
-            {
-                return $"{property} eq {value.ToLower()}";
-            }
-
+            var filterPropertyType = typeof(T).GetProperty(property).PropertyType;
+        
             if (dataGrid.FilterCaseSensitivity == FilterCaseSensitivity.CaseInsensitive && filterPropertyType == typeof(string))
             {
                 property = $"tolower({property})";
@@ -82,9 +74,6 @@ namespace BlazorRadzenGridTests.BlazorApp.Extensions
                         $"{property} ne tolower('{value}')" :
                         $"{property} ne '{value}'";
                 }
-            }
-            else if (typeof(IEnumerable).IsAssignableFrom(column.Property.GetType()) && filterPropertyType != typeof(string))
-            {
             }
             else if (PropertyAccess.IsNumeric(filterPropertyType))
             {
