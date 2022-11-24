@@ -1,0 +1,164 @@
+﻿@inject HttpClient HttpClient
+@page "/blazor-radzen-grid-tests"
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H3" Class="my-4">Adjust Artist Type</RadzenText>
+
+<RadzenDataGrid @ref="DataGrid"
+                Data="@GridItems"
+                Count="@TotalSize"
+                LoadData="@LoadData"
+                TItem="TestDataModel"
+                AllowVirtualization="true"
+                Style="height:800px"
+                AllowFiltering="true"
+                FilterMode="FilterMode.SimpleWithMenu"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                LogicalFilterOperator="LogicalFilterOperator.Or"
+                PageSize="25"
+                AllowMultiColumnSorting="false"
+                AllowSorting="true">
+    <Columns>
+        <RadzenDataGridColumn TItem="TestDataModel" Property="ArtistType" Title="Type" Width="200px" FilterValue="@currentArtistTypeFilterOptions">
+            <Template Context="item">
+                <div class="btn-group btn-group-toggle">
+                    <div class="btn-group btn-group-toggle">
+                        @foreach (var artistType in ArtistTypeOptions)
+                        {
+                            var active = artistType == item.ArtistType ? "active" : "";
+                            <button class="btn btn-outline-info @active" @onclick="() => OnSelectedChanged_ArtistType(item, artistType)">@artistType</button>
+                        }
+                    </div>
+                </div>
+            </Template>
+            <FilterTemplate>
+                <RadzenDropDown @bind-Value="@currentArtistTypeFilterOptions"
+                                TextProperty="Text" ValueProperty="Value" Style="width:100%;"
+                                Change=@OnComboBoxSelectedArtistTypeFilter
+                                Data="@(Enum.GetValues(typeof(ArtistTypeFilterOptions)).Cast<ArtistTypeFilterOptions>().Select(t => new { Text = $"{t}", Value = t }))" />
+            </FilterTemplate>
+            <FooterTemplate>
+                <RadzenButton class="rz-secondary rz-shade-default" Click="@OnButtonClick_ResetFilters">Clear Filters</RadzenButton>
+            </FooterTemplate>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="TestDataModel" Property="Name" FilterProperty="Name" Title="Name">
+
+        </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="TestDataModel" Property="IsVerified" FilterProperty="IsVerified" Title="Verified" Width="130px" Type="typeof(bool)">
+            <Template Context="detail">
+                <RadzenCheckBox @bind-Value=@detail.IsVerified TValue="bool" Change=@(args => OnCheckboxClicked_IsVerified(detail, args)) />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="TestDataModel" Property="ArtistId" Title="Discogs URL" Sortable="false" Width="150px" Type="typeof(int)">
+            <Template Context="detail">
+                <a href="https://www.discogs.com/artist/@detail.ArtistId" target="_blank" rel="noopener noreferrer">@detail.ArtistId</a>
+            </Template>
+            <FooterTemplate>
+                <b>@TotalSize items</b>
+            </FooterTemplate>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+
+    RadzenDataGrid<TestDataModel>? DataGrid;
+
+    ArtistTypeFilterOptions? currentArtistTypeFilterOptions;
+
+    private List<string> ArtistTypeOptions = new List<string> { "Person", "Group" };
+
+    IEnumerable<TestDataModel> GridItems = Array.Empty<TestDataModel>();
+    int TotalSize;
+
+    void OnComboBoxSelectedArtistTypeFilter(object value)
+    {
+        if (currentArtistTypeFilterOptions == ArtistTypeFilterOptions.All)
+        {
+            currentArtistTypeFilterOptions = null;
+        }
+    }
+
+    async Task LoadData(LoadDataArgs loadDataArgs)
+    {
+        var query = new Dictionary<string, string>();
+        query.Add("skip", loadDataArgs.Skip.Value.ToString());
+        query.Add("top", loadDataArgs.Top.Value.ToString());
+        query.Add("count", "true");
+
+        if (!String.IsNullOrEmpty(loadDataArgs.OrderBy))
+            query.Add("orderby", loadDataArgs.OrderBy);
+
+        /*
+    if (!String.IsNullOrEmpty(loadDataArgs.Filter)) //'(Name == null ? "" : Name).ToLower().Contains("Air".ToLower())'
+        query.Add("filter", loadDataArgs.Filter);
+
+        //
+        // https://localhost:7290/odata/ODataTest?skip=0&top=10&count=true&$filter=contains(tolower(Name), tolower('10'))
+         Filter from radzen grid '(Name == null ? "" : Name).ToLower().Contains("10".ToLower())'
+
+         Another issue with determing what kind of data type the filter is so that the filter string for a boolean check can be generated;
+         What I would expect: 
+         IsVerified eq false 
+
+         The 
+         */
+                
+       if (loadDataArgs.Filters.Count() > 0)
+        {
+            // IsIgnored eq false
+            //  https://localhost:7290/odata/DiscogsArtistAdjustType?skip=0&top=36&count=true&$filter=IsIgnored eq false
+            string odataFilter = loadDataArgs.Filters.ToODataFilterString(DataGrid);
+            
+            if (!String.IsNullOrEmpty(odataFilter))
+            {
+                query.Add("filter", odataFilter);
+            }
+        }
+
+        var uri = QueryHelpers.AddQueryString("odata/ODataTest", query);
+
+        var response = await HttpClient.GetFromJsonAsync<ODataPagedResultModel<TestDataModel>>(uri);
+
+        TotalSize = response.TotalSize;
+
+        GridItems = response.Value.AsODataEnumerable(); //https://blazor.radzen.com/datagrid-odata todo
+    }
+
+    private async Task OnSelectedChanged_ArtistType(TestDataModel TestDataModel, string artistType)
+    {
+        if (TestDataModel.ArtistType != artistType)
+        {
+            TestDataModel.ArtistType = artistType;
+            await HttpClient.PostAsJsonAsync<TestDataModel>("api/ODataTestWrite", TestDataModel);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnCheckboxClicked_IsVerified(TestDataModel TestDataModel, bool isVerified)
+    {
+        TestDataModel.IsVerified = isVerified;
+        await HttpClient.PostAsJsonAsync<TestDataModel>("api/ODataTestWrite", TestDataModel);
+        StateHasChanged();
+    }
+      
+    public enum ArtistTypeFilterOptions
+    {
+        Person,
+        Group,
+        All = -1
+    }
+
+    void OnButtonClick_ResetFilters()
+    {
+        if (DataGrid != null)
+        {
+            foreach (var c in DataGrid.ColumnsCollection)
+            {
+                c.ClearFilters();
+            }
+            DataGrid.Reload();
+        }
+    }
+}
+
+
