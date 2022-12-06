@@ -8,9 +8,12 @@
 <RadzenDataGrid @ref="DataGrid"
                 Data="@GridItems"
                 Count="@TotalSize"
+                Density="@Density.Compact"
                 LoadData="@LoadData"
+                Comp
                 TItem="TestDataModel"
                 AllowVirtualization="true"
+                AllowAlternatingRows="false"
                 Style="height:800px"
                 AllowFiltering="true"
                 FilterMode="FilterMode.SimpleWithMenu"
@@ -20,6 +23,38 @@
                 AllowMultiColumnSorting="false"
                 AllowSorting="true">
     <Columns>
+        <RadzenDataGridColumn TItem="TestDataModel" Title="Nested" Width="200px">
+            <Template Context="item">
+                <table style="width: 100%">
+                    <tr>
+                        <td>Nested</td>
+                        <td>Table</td>
+                    </tr>
+                    <tr>
+                        <td>Test</td>
+                        <td>Test</td>
+                    </tr>
+                </table>
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="TestDataModel" Title="Nested" Width="200px">
+            <Template Context="item">
+                <table style="width: 100%">
+                    <tr>
+                        <td>Another</td>
+                        <td>Table</td>
+                    </tr>
+                    <tr>
+                        <td>Another</td>
+                        <td>Table</td>
+                    </tr>
+                    <tr>
+                        <td>Test</td>
+                        <td>Test</td>
+                    </tr>
+                </table>
+            </Template>
+        </RadzenDataGridColumn>
         <RadzenDataGridColumn TItem="TestDataModel" Property="ArtistType" Title="Type" Width="200px" FilterValue="@currentArtistTypeFilterOptions">
             <Template Context="item">
                 <div class="btn-group btn-group-toggle">
